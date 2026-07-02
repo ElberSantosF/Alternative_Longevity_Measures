@@ -1,6 +1,6 @@
 # Projeto Longevidade
 
-Migracao para Python do projeto de Iniciacao Cientifica sobre medidas alternativas de longevidade. A analise usa hazard acumulado `H = -log(l)` para estudar sobrevivencia excepcional, sem baixar dados automaticamente do HMD.
+Projeto em Python para analisar planilhas locais de tabuas de vida. A analise usa hazard acumulado `H = -log(l)` para estudar sobrevivencia excepcional.
 
 ## Estrutura
 
@@ -12,8 +12,7 @@ src/
   analysis/indicators.py   # Indicadores comparativos
   visualization/plots.py   # Graficos Matplotlib/Seaborn
 notebooks/
-  01_hmd_analysis.ipynb
-  02_nordeste_chile.ipynb
+  01_local_excel_analysis.ipynb
 data/raw/
 outputs/figures/
 tests/
@@ -29,16 +28,11 @@ pip install -r requirements.txt
 
 ## Dados
 
-Coloque as planilhas originais em `data/raw/`. O loader aceita arquivos `.xlsx`, `.xls` e `.csv` com colunas de idade e sobreviventes, usando aliases como `IDADE`, `Idade`, `Age` e `lx`.
+Coloque as planilhas em `data/raw/`. O loader aceita arquivos `.xlsx`, `.xls` e `.csv` com colunas de idade e sobreviventes, usando aliases como `IDADE`, `Idade`, `Age` e `lx`.
 
-Arquivos esperados:
+Exemplo:
 
 ```text
-HMD_SWE.xlsx
-HMD_DNK.xlsx
-HMD_FRATNP.xlsx
-HMD_CHL.xlsx
-HMD_JPN.xlsx
 tabua_vida_feminina_nordeste_2025.xlsx
 tabua_vida_feminina_chile_2023.xlsx
 ```
@@ -46,22 +40,25 @@ tabua_vida_feminina_chile_2023.xlsx
 ## Uso
 
 ```python
-from src.data.loaders import LifeTableRepository
+from src.data.loaders import load_life_table
 from src.analysis.hazard import add_survival_hazard
 from src.analysis.indicators import build_indicators
 
-repo = LifeTableRepository()
-df = repo.load("tabua_vida_feminina_nordeste_2025.xlsx", country="Nordeste (Brasil)", year=2025)
+df = load_life_table(
+    "tabua_vida_feminina_nordeste_2025.xlsx",
+    country="Nordeste (Brasil)",
+    year=2025,
+)
 lt = add_survival_hazard(df)
 indicators = build_indicators(lt)
 ```
 
-Os notebooks recriam os graficos originais e salvam as figuras em `outputs/figures/`.
+O notebook principal gera indicadores e salva figuras em `outputs/figures/`.
 
 ## Testes
 
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Git
@@ -76,4 +73,3 @@ git commit -m "feat: scaffold longevity analysis package"
 ```
 
 Use commits semanticos como `feat:`, `fix:`, `docs:` e `refactor:`.
-

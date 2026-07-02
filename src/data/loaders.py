@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import re
 import unicodedata
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import pandas as pd
 
-from src.config.settings import COUNTRY_FILE_HINTS, RAW_DATA_DIR
+from src.config.settings import DATA_DIR, RAW_DATA_DIR
 
 
 AGE_ALIASES = ("IDADE", "Idade", "Age", "age", "x")
@@ -24,15 +22,9 @@ def _strip_accents(value: str) -> str:
 
 
 def infer_country_from_filename(path: str | Path) -> str:
-    """Infer a country/location code from a life-table filename."""
+    """Infer a readable location label from a local filename."""
     filename = _strip_accents(Path(path).stem).lower()
-    for code, hint in COUNTRY_FILE_HINTS.items():
-        if hint.lower() in filename:
-            return code
-    match = re.search(r"hmd[_ -]?([a-z0-9]+)", filename)
-    if match:
-        return match.group(1).upper()
-    return Path(path).stem.upper()
+    return filename.replace("_", " ").replace("-", " ").title()
 
 
 def _first_existing(columns: Iterable[str], aliases: Iterable[str]) -> str | None:
@@ -69,6 +61,8 @@ def load_life_table(
     supplied explicitly.
     """
     file_path = Path(path)
+    if not file_path.is_absolute():
+        file_path = RAW_DATA_DIR / file_path
     if not file_path.exists():
         raise FileNotFoundError(file_path)
 
@@ -109,34 +103,54 @@ def load_life_table(
     )
 
 
-@dataclass(frozen=True)
-class LifeTableRepository:
-    """Repository for local life table files."""
+def load_life_tables(files: Iterable[str | Path | Mapping[str, object]]) -> pd.DataFrame:
+    """Load and concatenate multiple local life table files.
 
-    raw_dir: Path = RAW_DATA_DIR
+    Each item can be a filename/path or a mapping with ``filename``, ``country``,
+    ``year`` and ``sheet_name`` keys.
+    """
+    frames = []
+    for item in files:
+        if isinstance(item, Mapping):
+            filename = item.get("filename") or item.get("path")
+            if filename is None:
+                raise ValueError("Each file mapping must contain 'filename' or 'path'.")
+            frames.append(
+                load_life_table(
+                    filename,
+                    country=item.get("label") or item.get("country"),
+                    year=item.get("year"),
+                    sheet_name=item.get("sheet_name", 0),
+                )
+            )
+        else:
+            frames.append(load_life_table(item))
 
-    def resolve(self, filename: str | Path) -> Path:
-        """Resolve a file path relative to the raw data directory."""
-        path = Path(filename)
-        return path if path.is_absolute() else self.raw_dir / path
+    if not frames:
+        return pd.DataFrame(columns=["country", "year", "age", "lx"])
+    return pd.concat(frames, ignore_index=True)
 
-    def load(
-        self,
-        filename: str | Path,
-        *,
-        country: str | None = None,
-        year: int | None = None,
-        sheet_name: str | int | None = 0,
-    ) -> pd.DataFrame:
-        """Load a single life table."""
-        return load_life_table(
-            self.resolve(filename), country=country, year=year, sheet_name=sheet_name
-        )
 
-    def load_many(self, files: Iterable[str | Path]) -> pd.DataFrame:
-        """Load and concatenate multiple life table files."""
-        frames = [self.load(file) for file in files]
-        if not frames:
-            return pd.DataFrame(columns=["country", "year", "age", "lx"])
-        return pd.concat(frames, ignore_index=True)
+def load_metadata(path: str | Path | None = None) -> pd.DataFrame:
+    """Load the spreadsheet catalog used by the notebook.
 
+    The metadata file must contain ``filename`` and can optionally contain
+    ``country``, ``year`` and ``sheet_name``.
+    """
+    metadata_path = Path(path) if path is not None else DATA_DIR / "metadata.csv"
+    if not metadata_path.is_absolute():
+        metadata_path = DATA_DIR / metadata_path
+    if not metadata_path.exists():
+        raise FileNotFoundError(metadata_path)
+
+    metadata = pd.read_csv(metadata_path)
+    if "filename" not in metadata.columns:
+        raise ValueError("metadata.csv must contain a 'filename' column.")
+    return metadata
+
+
+def load_life_tables_from_metadata(path: str | Path | None = None) -> pd.DataFrame:
+    """Load all life tables listed in ``data/metadata.csv``."""
+    metadata = load_metadata(path)
+    files = metadata.where(pd.notna(metadata), None).to_dict("records")
+    return load_life_tables(files)
