@@ -30,12 +30,38 @@ pip install -r requirements.txt
 
 Coloque as planilhas em `data/raw/`. O loader aceita arquivos `.xlsx`, `.xls` e `.csv` com colunas de idade e sobreviventes, usando aliases como `IDADE`, `Idade`, `Age` e `lx`.
 
-Exemplo:
+Cadastre as planilhas em `data/metadata.csv` usando nomes padronizados, sem acento e sem espaco:
 
 ```text
 tabua_vida_feminina_nordeste_2025.xlsx
 tabua_vida_feminina_chile_2023.xlsx
+tabua_vida_masculina_nordeste_2025.xlsx
+tabua_vida_masculina_chile_2023.xlsx
 ```
+
+Exemplo de `metadata.csv`:
+
+```csv
+filename,country,year,sex,label
+tabua_vida_feminina_nordeste_2025.xlsx,Nordeste (Brasil),2025,Feminino,Nordeste (Brasil) - Feminino
+```
+
+## Analises
+
+O projeto usa apenas tabuas de periodo. A partir de `lx`, calcula:
+
+```text
+l = lx / l0
+H = -log(l)
+H(60), H(70), H(80), H(90), H(100)
+x_H1 ... x_H8
+idade mediana aproximada
+idade modal aproximada
+e0/e50/e90 aproximados por area sob l(x)
+correlacoes e rankings entre indicadores
+```
+
+As medidas de expectativa de vida, mediana e moda sao aproximacoes derivadas da curva `l(x)`, porque as planilhas locais nao trazem `ex`, `dx` e `ax`.
 
 ## Uso
 
