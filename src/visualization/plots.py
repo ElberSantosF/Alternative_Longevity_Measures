@@ -6,17 +6,34 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 
 from src.config.settings import FIGURES_DIR
 
 PALETTE = ["#2F5D8C", "#7A8796", "#2F7D6D", "#A4554A", "#6F5B8B", "#B07C3E"]
 TITLE_PAD = 14
+BRAZIL_REGIONS = ("Norte (Brasil)", "Nordeste (Brasil)")
+SEX_ORDER = ("Feminino", "Masculino")
+REPORT_INDICATORS = ("H_60", "H_70", "H_80", "H_90", "x_H1", "median_age", "e0_approx")
 
 
 def _palette_for(data, hue: str = "country"):
     levels = list(dict.fromkeys(data[hue].dropna()))
     return {level: PALETTE[index % len(PALETTE)] for index, level in enumerate(levels)}
+
+
+def _add_region_sex(data):
+    out = data.copy()
+    parts = out["country"].astype(str).str.rsplit(" - ", n=1, expand=True)
+    out["region"] = parts[0]
+    out["sex"] = parts[1] if parts.shape[1] > 1 else ""
+    return out
+
+
+def _brazil_region_data(data):
+    out = _add_region_sex(data)
+    return out.loc[out["region"].isin(BRAZIL_REGIONS)].copy()
 
 
 def _finish(fig, output_path: str | Path | None = None):
@@ -62,6 +79,31 @@ def _style_axis(ax, *, title: str, xlabel: str, ylabel: str):
 def _add_bar_labels(ax, *, fmt: str = "%.1f"):
     for container in ax.containers:
         ax.bar_label(container, fmt=fmt, fontsize=8, padding=3, color="#44505e")
+
+
+def _style_facet_grid(grid):
+    for ax in grid.axes.flat:
+        ax.grid(axis="x", visible=False)
+        ax.grid(axis="y", color="#e8ebef", linewidth=0.8)
+        ax.set_title(ax.get_title(), pad=TITLE_PAD, fontweight="semibold")
+    return grid
+
+
+def _legend_for_grid(grid, *, title: str):
+    if grid.legend is None:
+        return None
+    sns.move_legend(
+        grid,
+        "center left",
+        bbox_to_anchor=(1.02, 0.5),
+        title=title,
+        frameon=True,
+    )
+    grid.legend.get_frame().set_facecolor("white")
+    grid.legend.get_frame().set_edgecolor("#d7dbe0")
+    grid.legend.get_frame().set_linewidth(0.8)
+    grid.fig.subplots_adjust(right=0.74)
+    return grid.legend
 
 
 def set_theme() -> None:
@@ -363,3 +405,235 @@ def plot_indicator_rankings(rankings, output_path: str | Path | None = None):
     ax.tick_params(axis="x", rotation=20)
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "indicator_rankings.png")
+
+
+def plot_regional_hazard_by_sex(df, output_path: str | Path | None = None):
+    """Compare cumulative hazard for North and Northeast, faceted by sex."""
+    set_theme()
+    plot_data = _brazil_region_data(df)
+    grid = sns.relplot(
+        data=plot_data,
+        x="age",
+        y="H",
+        hue="region",
+        col="sex",
+        col_order=[sex for sex in SEX_ORDER if sex in plot_data["sex"].unique()],
+        kind="line",
+        palette=_palette_for(plot_data, "region"),
+        linewidth=2.6,
+        height=4.2,
+        aspect=1.2,
+        facet_kws={"sharey": True},
+    )
+    grid.set_axis_labels("Idade (x)", "Hazard acumulado H(x)")
+    grid.set_titles("{col_name}")
+    _style_facet_grid(grid)
+    _legend_for_grid(grid, title="Regiao")
+    grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
+    grid.fig.suptitle(
+        "Norte vs Nordeste: hazard acumulado por sexo",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "regional_hazard_by_sex.png")
+
+
+def plot_regional_survival_by_sex(df, output_path: str | Path | None = None):
+    """Compare normalized survival for North and Northeast, faceted by sex."""
+    set_theme()
+    plot_data = _brazil_region_data(df)
+    grid = sns.relplot(
+        data=plot_data,
+        x="age",
+        y="l",
+        hue="region",
+        col="sex",
+        col_order=[sex for sex in SEX_ORDER if sex in plot_data["sex"].unique()],
+        kind="line",
+        palette=_palette_for(plot_data, "region"),
+        linewidth=2.6,
+        height=4.2,
+        aspect=1.2,
+        facet_kws={"sharey": True},
+    )
+    grid.set_axis_labels("Idade (x)", "Sobrevivencia normalizada l(x)")
+    grid.set_titles("{col_name}")
+    _style_facet_grid(grid)
+    _legend_for_grid(grid, title="Regiao")
+    grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
+    grid.fig.suptitle(
+        "Norte vs Nordeste: sobrevivencia por sexo",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "regional_survival_by_sex.png")
+
+
+def plot_regional_hazard_gap_by_sex(df, output_path: str | Path | None = None):
+    """Plot H_North - H_Northeast by age for each sex."""
+    set_theme()
+    plot_data = _brazil_region_data(df)
+    wide = plot_data.pivot_table(index=["sex", "age"], columns="region", values="H").reset_index()
+    wide["gap"] = wide["Norte (Brasil)"] - wide["Nordeste (Brasil)"]
+
+    fig, ax = plt.subplots(figsize=(11, 5.8))
+    sns.lineplot(
+        data=wide.dropna(subset=["gap"]),
+        x="age",
+        y="gap",
+        hue="sex",
+        hue_order=[sex for sex in SEX_ORDER if sex in wide["sex"].unique()],
+        palette=_palette_for(wide, "sex"),
+        linewidth=2.6,
+        ax=ax,
+    )
+    ax.axhline(0, color="#28323f", linewidth=1)
+    _style_axis(
+        ax,
+        xlabel="Idade (x)",
+        ylabel="Diferenca de hazard acumulado",
+        title="Gap regional: H_Norte - H_Nordeste",
+    )
+    _legend_outside(ax, title="Sexo")
+    return _finish(fig, output_path or FIGURES_DIR / "regional_hazard_gap_by_sex.png")
+
+
+def plot_sex_hazard_gap_by_region(df, output_path: str | Path | None = None):
+    """Plot H_male - H_female by age for North and Northeast."""
+    set_theme()
+    plot_data = _brazil_region_data(df)
+    wide = plot_data.pivot_table(index=["region", "age"], columns="sex", values="H").reset_index()
+    wide["gap"] = wide["Masculino"] - wide["Feminino"]
+
+    fig, ax = plt.subplots(figsize=(11, 5.8))
+    sns.lineplot(
+        data=wide.dropna(subset=["gap"]),
+        x="age",
+        y="gap",
+        hue="region",
+        palette=_palette_for(wide, "region"),
+        linewidth=2.6,
+        ax=ax,
+    )
+    ax.axhline(0, color="#28323f", linewidth=1)
+    _style_axis(
+        ax,
+        xlabel="Idade (x)",
+        ylabel="Diferenca de hazard acumulado",
+        title="Gap por sexo: H_masculino - H_feminino",
+    )
+    _legend_outside(ax, title="Regiao")
+    return _finish(fig, output_path or FIGURES_DIR / "sex_hazard_gap_by_region.png")
+
+
+def plot_benchmark_hazard_gap_vs_chile(df, output_path: str | Path | None = None):
+    """Plot Brazilian regional hazard gaps against Chile, by sex."""
+    set_theme()
+    selected = _add_region_sex(df)
+    selected = selected.loc[selected["region"].isin((*BRAZIL_REGIONS, "Chile"))].copy()
+    wide = selected.pivot_table(index=["sex", "age"], columns="region", values="H").reset_index()
+    rows = []
+    for region in BRAZIL_REGIONS:
+        temp = wide[["sex", "age", "Chile", region]].copy()
+        temp["region"] = region
+        temp["gap"] = temp[region] - temp["Chile"]
+        rows.append(temp[["sex", "age", "region", "gap"]])
+    plot_data = pd.concat(rows, ignore_index=True).dropna(subset=["gap"])
+
+    grid = sns.relplot(
+        data=plot_data,
+        x="age",
+        y="gap",
+        hue="region",
+        col="sex",
+        col_order=[sex for sex in SEX_ORDER if sex in plot_data["sex"].unique()],
+        kind="line",
+        palette=_palette_for(plot_data, "region"),
+        linewidth=2.6,
+        height=4.2,
+        aspect=1.2,
+        facet_kws={"sharey": True},
+    )
+    for ax in grid.axes.flat:
+        ax.axhline(0, color="#28323f", linewidth=1)
+    grid.set_axis_labels("Idade (x)", "Diferenca de hazard acumulado vs Chile")
+    grid.set_titles("{col_name}")
+    _style_facet_grid(grid)
+    _legend_for_grid(grid, title="Regiao")
+    grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
+    grid.fig.suptitle(
+        "Benchmark externo: regioes brasileiras vs Chile",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "benchmark_hazard_gap_vs_chile.png")
+
+
+def plot_indicator_heatmap_standardized(indicators, output_path: str | Path | None = None):
+    """Plot standardized indicator values for all groups."""
+    set_theme()
+    columns = [col for col in REPORT_INDICATORS if col in indicators.columns]
+    values = indicators.set_index("country")[columns].copy()
+    standardized = (values - values.mean()) / values.std(ddof=0)
+
+    fig, ax = plt.subplots(figsize=(10.5, 5.8))
+    sns.heatmap(
+        standardized,
+        cmap="vlag",
+        center=0,
+        linewidths=0.8,
+        linecolor="white",
+        annot=values,
+        fmt=".1f",
+        cbar_kws={"label": "valor padronizado"},
+        ax=ax,
+    )
+    ax.set_title("Resumo padronizado dos indicadores", loc="left", pad=TITLE_PAD, fontweight="semibold")
+    ax.set_xlabel("Indicador")
+    ax.set_ylabel("Localidade")
+    ax.tick_params(axis="x", rotation=30)
+    ax.tick_params(axis="y", rotation=0)
+    return _finish(fig, output_path or FIGURES_DIR / "indicator_heatmap_standardized.png")
+
+
+def plot_indicator_bars_brazil_regions(indicators, output_path: str | Path | None = None):
+    """Plot selected indicators for North and Northeast only."""
+    set_theme()
+    plot_data = _brazil_region_data(indicators)
+    columns = [col for col in REPORT_INDICATORS if col in plot_data.columns]
+    long = plot_data.melt(
+        id_vars=["country", "region", "sex"],
+        value_vars=columns,
+        var_name="indicator",
+        value_name="value",
+    ).dropna(subset=["value"])
+
+    grid = sns.catplot(
+        data=long,
+        x="value",
+        y="country",
+        hue="sex",
+        col="indicator",
+        col_wrap=3,
+        kind="bar",
+        palette=_palette_for(long, "sex"),
+        height=3.2,
+        aspect=1.25,
+        sharex=False,
+        sharey=True,
+    )
+    grid.set_axis_labels("Valor", "Localidade")
+    grid.set_titles("{col_name}")
+    _style_facet_grid(grid)
+    _legend_for_grid(grid, title="Sexo")
+    grid.fig.subplots_adjust(top=0.88, right=0.78, wspace=0.42, hspace=0.35)
+    grid.fig.suptitle(
+        "Indicadores selecionados: Norte e Nordeste",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "indicator_bars_brazil_regions.png")
