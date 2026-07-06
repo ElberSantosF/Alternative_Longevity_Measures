@@ -11,9 +11,9 @@ import pandas as pd
 from src.config.settings import DATA_DIR, RAW_DATA_DIR
 
 
-AGE_ALIASES = ("IDADE", "Idade", "Age", "age", "x")
+AGE_ALIASES = ("age", "Age", "x")
 LX_ALIASES = ("lx", "LX", "Lx")
-YEAR_ALIASES = ("Year", "year", "ANO", "Ano", "ano")
+YEAR_ALIASES = ("year", "Year")
 
 
 def _strip_accents(value: str) -> str:

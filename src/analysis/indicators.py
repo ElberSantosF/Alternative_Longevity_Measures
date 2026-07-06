@@ -235,8 +235,8 @@ def sex_indicator_gaps(
     rows = []
     for keys, group in data.groupby(["region", "year"], dropna=False):
         region, year = keys
-        female = group.loc[group["sex"] == "Feminino"]
-        male = group.loc[group["sex"] == "Masculino"]
+        female = group.loc[group["sex"] == "Female"]
+        male = group.loc[group["sex"] == "Male"]
         if female.empty or male.empty:
             continue
         female_row = female.iloc[0]

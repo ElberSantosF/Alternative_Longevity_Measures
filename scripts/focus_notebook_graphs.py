@@ -48,10 +48,10 @@ def source_text(cell: dict) -> str:
 def should_remove_heading(text: str) -> bool:
     normalized = text.strip().lower()
     return (
-        normalized.startswith("## correla") and "rankings" in normalized
+        normalized.startswith("## correlation") and "rankings" in normalized
     ) or normalized in {
-        "## norte vs nordeste",
-        "## resumo de indicadores",
+        "## north vs northeast",
+        "## indicator summary",
     }
 
 
@@ -74,11 +74,11 @@ def main() -> None:
     for cell in kept:
         text = source_text(cell)
         if text:
-            if cell.get("cell_type") == "markdown" and text.startswith("## Analises adicionais"):
+            if cell.get("cell_type") == "markdown" and text.startswith("## Additional analyses"):
                 text = (
-                    "## Analises adicionais\n\n"
-                    "Probabilidades condicionais, tabela de decomposicao do hazard por faixa etaria "
-                    "e gap feminino-masculino em indicadores resumidos.\n"
+                    "## Additional analyses\n\n"
+                    "Conditional survival probabilities, hazard decomposition by age band, "
+                    "and female-male gaps in summary indicators.\n"
                 )
             for old, new in REPLACEMENTS.items():
                 text = text.replace(old, new)

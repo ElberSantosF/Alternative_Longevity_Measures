@@ -28,22 +28,22 @@ pip install -r requirements.txt
 
 ## Data
 
-Place the spreadsheets in `data/raw/`. The loader accepts `.xlsx`, `.xls`, and `.csv` files with age and survivor columns, using aliases such as `IDADE`, `Idade`, `Age`, and `lx`.
+Place the spreadsheets in `data/raw/`. The loader accepts `.xlsx`, `.xls`, and `.csv` files with age and survivor columns, using names such as `age` and `lx`.
 
 Register the spreadsheets in `data/metadata.csv` using standardized names without accents or spaces:
 
 ```text
-tabua_vida_feminina_nordeste_2025.xlsx
-tabua_vida_feminina_chile_2023.xlsx
-tabua_vida_masculina_nordeste_2025.xlsx
-tabua_vida_masculina_chile_2023.xlsx
+female_life_table_northeast_brazil_2025.xlsx
+female_life_table_chile_2023.xlsx
+male_life_table_northeast_brazil_2025.xlsx
+male_life_table_chile_2023.xlsx
 ```
 
 Example `metadata.csv`:
 
 ```csv
 filename,country,year,sex,label
-tabua_vida_feminina_nordeste_2025.xlsx,Nordeste (Brasil),2025,Feminino,Nordeste (Brasil) - Feminino
+female_life_table_northeast_brazil_2025.xlsx,Northeast Brazil,2025,Female,Northeast Brazil - Female
 ```
 
 ## Analyses
@@ -71,8 +71,8 @@ from src.analysis.hazard import add_survival_hazard
 from src.analysis.indicators import build_indicators
 
 df = load_life_table(
-    "tabua_vida_feminina_nordeste_2025.xlsx",
-    country="Nordeste (Brasil)",
+    "female_life_table_northeast_brazil_2025.xlsx",
+    country="Northeast Brazil",
     year=2025,
 )
 lt = add_survival_hazard(df)

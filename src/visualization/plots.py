@@ -13,8 +13,8 @@ from src.config.settings import FIGURES_DIR
 
 PALETTE = ["#2F5D8C", "#7A8796", "#2F7D6D", "#A4554A", "#6F5B8B", "#B07C3E"]
 TITLE_PAD = 14
-BRAZIL_REGIONS = ("Norte (Brasil)", "Nordeste (Brasil)")
-SEX_ORDER = ("Feminino", "Masculino")
+BRAZIL_REGIONS = ("North Brazil", "Northeast Brazil")
+SEX_ORDER = ("Female", "Male")
 REPORT_INDICATORS = ("H_60", "H_70", "H_80", "H_90", "x_H1", "median_age", "e0_approx")
 
 
@@ -45,7 +45,7 @@ def _finish(fig, output_path: str | Path | None = None):
     return fig
 
 
-def _legend_outside(ax, *, title: str = "Localidade", ncol: int = 1):
+def _legend_outside(ax, *, title: str = "Location", ncol: int = 1):
     """Move legends out of the plotting area and reserve space for them."""
     handles, labels = ax.get_legend_handles_labels()
     if not handles:
@@ -161,9 +161,9 @@ def plot_hazard_curves(df, output_path: str | Path | None = None):
 
     _style_axis(
         ax,
-        xlabel="Idade (x)",
-        ylabel="Hazard acumulado H(x) = -log(l)",
-        title="Hazard acumulado de mortalidade",
+        xlabel="Age (x)",
+        ylabel="Cumulative hazard H(x) = -log(l)",
+        title="Cumulative mortality hazard",
     )
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "hazard_curves.png")
@@ -190,9 +190,9 @@ def plot_milestone_bars(milestones_long, output_path: str | Path | None = None):
     ax.set_ylim(top=milestones_long["age_at_k"].max() + 5)
     _style_axis(
         ax,
-        xlabel="Número de desafios acumulados (k)",
-        ylabel="Idade em que H atinge k",
-        title="Idade em que o hazard acumulado atinge H = k",
+        xlabel="Number of accumulated challenges (k)",
+        ylabel="Age when H reaches k",
+        title="Age when cumulative hazard reaches H = k",
     )
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "milestone_bars.png")
@@ -225,9 +225,9 @@ def plot_survival_curves(df, output_path: str | Path | None = None):
     )
     _style_axis(
         ax,
-        xlabel="Idade (x)",
-        ylabel="Sobrevivência normalizada l(x)",
-        title="Função de sobrevivência por idade",
+        xlabel="Age (x)",
+        ylabel="Normalized survival l(x)",
+        title="Survival function by age",
     )
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "survival_curves.png")
@@ -259,9 +259,9 @@ def plot_fixed_age_hazards(indicators, output_path: str | Path | None = None):
     )
     _style_axis(
         ax,
-        xlabel="Idade fixa",
+        xlabel="Fixed age",
         ylabel="H(x)",
-        title="Hazard acumulado em idades fixas",
+        title="Cumulative hazard at fixed ages",
     )
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "fixed_age_hazards.png")
@@ -281,16 +281,16 @@ def plot_milestone_differences(differences, output_path: str | Path | None = Non
     )
     ax.axhline(0, color="#28323f", linewidth=1)
     _add_bar_labels(ax)
-    reference = differences["reference_country"].iloc[0] if not differences.empty else "referencia"
+    reference = differences["reference_country"].iloc[0] if not differences.empty else "reference"
     y_values = differences["difference_years"].dropna()
     if not y_values.empty:
         pad = max((y_values.max() - y_values.min()) * 0.12, 1)
         ax.set_ylim(y_values.min() - pad, y_values.max() + pad)
     _style_axis(
         ax,
-        xlabel="Número de desafios acumulados (k)",
-        ylabel=f"Diferença em anos vs {reference}",
-        title="Diferença nas idades de marcos H=k",
+        xlabel="Number of accumulated challenges (k)",
+        ylabel=f"Difference in years vs {reference}",
+        title="Difference in H=k milestone ages",
     )
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "milestone_differences.png")
@@ -311,10 +311,10 @@ def plot_correlation_heatmap(correlations, output_path: str | Path | None = None
         square=True,
         linewidths=0.8,
         linecolor="white",
-        cbar_kws={"label": "correlação"},
+        cbar_kws={"label": "correlation"},
         ax=ax,
     )
-    ax.set_title("Correlação entre indicadores de longevidade", loc="left", pad=TITLE_PAD, fontweight="semibold")
+    ax.set_title("Correlation among longevity indicators", loc="left", pad=TITLE_PAD, fontweight="semibold")
     ax.tick_params(axis="x", rotation=35, labelsize=9)
     ax.tick_params(axis="y", rotation=0)
     return _finish(fig, output_path or FIGURES_DIR / "indicator_correlations.png")
@@ -350,20 +350,20 @@ def plot_indicator_scatter(indicators, output_path: str | Path | None = None):
         linewidth=0.8,
         facet_kws={"sharex": False, "sharey": True},
     )
-    grid.set_axis_labels("Valor do indicador", "H_max")
+    grid.set_axis_labels("Indicator value", "H_max")
     grid.set_titles("{col_name}")
     for ax in grid.axes.flat:
         ax.grid(axis="x", visible=False)
         ax.grid(axis="y", color="#e8ebef", linewidth=0.8)
     if grid.legend is not None:
-        grid.legend.set_title("Localidade")
+        grid.legend.set_title("Location")
         grid.legend.set_bbox_to_anchor((1.02, 0.95))
         grid.legend._loc = 2
         grid.legend.get_frame().set_facecolor("white")
         grid.legend.get_frame().set_edgecolor("#d7dbe0")
     grid.fig.subplots_adjust(top=0.88, right=0.82, wspace=0.25, hspace=0.32)
     grid.fig.suptitle(
-        "Indicadores convencionais vs hazard acumulado máximo",
+        "Conventional indicators vs maximum cumulative hazard",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -398,9 +398,9 @@ def plot_indicator_rankings(rankings, output_path: str | Path | None = None):
     ax.invert_yaxis()
     _style_axis(
         ax,
-        xlabel="Indicador",
-        ylabel="Ranking (1 = melhor)",
-        title="Ranking comparativo por indicador",
+        xlabel="Indicator",
+        ylabel="Ranking (1 = best)",
+        title="Comparative ranking by indicator",
     )
     ax.tick_params(axis="x", rotation=20)
     _legend_outside(ax)
@@ -425,13 +425,13 @@ def plot_regional_hazard_by_sex(df, output_path: str | Path | None = None):
         aspect=1.2,
         facet_kws={"sharey": True},
     )
-    grid.set_axis_labels("Idade (x)", "Hazard acumulado H(x)")
+    grid.set_axis_labels("Age (x)", "Cumulative hazard H(x)")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
-    _legend_for_grid(grid, title="Regiao")
+    _legend_for_grid(grid, title="Region")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
-        "Norte vs Nordeste: hazard acumulado por sexo",
+        "North vs Northeast: cumulative hazard by sex",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -457,13 +457,13 @@ def plot_regional_survival_by_sex(df, output_path: str | Path | None = None):
         aspect=1.2,
         facet_kws={"sharey": True},
     )
-    grid.set_axis_labels("Idade (x)", "Sobrevivencia normalizada l(x)")
+    grid.set_axis_labels("Age (x)", "Normalized survival l(x)")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
-    _legend_for_grid(grid, title="Regiao")
+    _legend_for_grid(grid, title="Region")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
-        "Norte vs Nordeste: sobrevivencia por sexo",
+        "North vs Northeast: survival by sex",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -476,7 +476,7 @@ def plot_regional_hazard_gap_by_sex(df, output_path: str | Path | None = None):
     set_theme()
     plot_data = _brazil_region_data(df)
     wide = plot_data.pivot_table(index=["sex", "age"], columns="region", values="H").reset_index()
-    wide["gap"] = wide["Norte (Brasil)"] - wide["Nordeste (Brasil)"]
+    wide["gap"] = wide["North Brazil"] - wide["Northeast Brazil"]
 
     fig, ax = plt.subplots(figsize=(11, 5.8))
     sns.lineplot(
@@ -492,11 +492,11 @@ def plot_regional_hazard_gap_by_sex(df, output_path: str | Path | None = None):
     ax.axhline(0, color="#28323f", linewidth=1)
     _style_axis(
         ax,
-        xlabel="Idade (x)",
-        ylabel="Diferença de hazard acumulado",
-        title="Gap regional: H_Norte - H_Nordeste",
+        xlabel="Age (x)",
+        ylabel="Cumulative hazard difference",
+        title="Regional gap: H_North - H_Northeast",
     )
-    _legend_outside(ax, title="Sexo")
+    _legend_outside(ax, title="Sex")
     return _finish(fig, output_path or FIGURES_DIR / "regional_hazard_gap_by_sex.png")
 
 
@@ -505,7 +505,7 @@ def plot_sex_hazard_gap_by_region(df, output_path: str | Path | None = None):
     set_theme()
     plot_data = _brazil_region_data(df)
     wide = plot_data.pivot_table(index=["region", "age"], columns="sex", values="H").reset_index()
-    wide["gap"] = wide["Masculino"] - wide["Feminino"]
+    wide["gap"] = wide["Male"] - wide["Female"]
 
     fig, ax = plt.subplots(figsize=(11, 5.8))
     sns.lineplot(
@@ -520,11 +520,11 @@ def plot_sex_hazard_gap_by_region(df, output_path: str | Path | None = None):
     ax.axhline(0, color="#28323f", linewidth=1)
     _style_axis(
         ax,
-        xlabel="Idade (x)",
-        ylabel="Diferença de hazard acumulado",
-        title="Gap por sexo: H_masculino - H_feminino",
+        xlabel="Age (x)",
+        ylabel="Cumulative hazard difference",
+        title="Sex gap: H_male - H_female",
     )
-    _legend_outside(ax, title="Regiao")
+    _legend_outside(ax, title="Region")
     return _finish(fig, output_path or FIGURES_DIR / "sex_hazard_gap_by_region.png")
 
 
@@ -558,13 +558,13 @@ def plot_benchmark_hazard_gap_vs_chile(df, output_path: str | Path | None = None
     )
     for ax in grid.axes.flat:
         ax.axhline(0, color="#28323f", linewidth=1)
-    grid.set_axis_labels("Idade (x)", "Diferença de hazard acumulado vs Chile")
+    grid.set_axis_labels("Age (x)", "Cumulative hazard difference vs Chile")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
-    _legend_for_grid(grid, title="Região")
+    _legend_for_grid(grid, title="Region")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
-        "Benchmark externo: regiões brasileiras vs Chile",
+        "External benchmark: Brazilian regions vs Chile",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -588,12 +588,12 @@ def plot_indicator_heatmap_standardized(indicators, output_path: str | Path | No
         linecolor="white",
         annot=values,
         fmt=".1f",
-        cbar_kws={"label": "valor padronizado"},
+        cbar_kws={"label": "standardized value"},
         ax=ax,
     )
-    ax.set_title("Resumo padronizado dos indicadores", loc="left", pad=TITLE_PAD, fontweight="semibold")
-    ax.set_xlabel("Indicador")
-    ax.set_ylabel("Localidade")
+    ax.set_title("Standardized indicator summary", loc="left", pad=TITLE_PAD, fontweight="semibold")
+    ax.set_xlabel("Indicator")
+    ax.set_ylabel("Location")
     ax.tick_params(axis="x", rotation=30)
     ax.tick_params(axis="y", rotation=0)
     return _finish(fig, output_path or FIGURES_DIR / "indicator_heatmap_standardized.png")
@@ -625,13 +625,13 @@ def plot_indicator_bars_brazil_regions(indicators, output_path: str | Path | Non
         sharex=False,
         sharey=True,
     )
-    grid.set_axis_labels("Valor", "Localidade")
+    grid.set_axis_labels("Value", "Location")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
-    _legend_for_grid(grid, title="Sexo")
+    _legend_for_grid(grid, title="Sex")
     grid.fig.subplots_adjust(top=0.88, right=0.78, wspace=0.42, hspace=0.35)
     grid.fig.suptitle(
-        "Indicadores selecionados: Norte e Nordeste",
+        "Selected indicators: North and Northeast",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -660,14 +660,14 @@ def plot_conditional_survival(conditional_survival, output_path: str | Path | No
         sharey=True,
         legend=False,
     )
-    grid.set_axis_labels("Probabilidade condicional (%)", "Localidade")
-    grid.set_titles("{col_name} anos")
+    grid.set_axis_labels("Conditional probability (%)", "Location")
+    grid.set_titles("{col_name} years")
     _style_facet_grid(grid)
     for ax in grid.axes.flat:
         _add_bar_labels(ax, fmt="%.1f")
     grid.fig.subplots_adjust(top=0.88, wspace=0.28, hspace=0.35)
     grid.fig.suptitle(
-        "Probabilidade de sobreviver entre idades selecionadas",
+        "Probability of surviving between selected ages",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -694,7 +694,7 @@ def plot_age_band_hazard_contributions(age_band_contributions, output_path: str 
         sharey=False,
         legend=False,
     )
-    grid.set_axis_labels("Faixa etária", "Incremento de H")
+    grid.set_axis_labels("Age band", "H increment")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
     for ax in grid.axes.flat:
@@ -702,7 +702,7 @@ def plot_age_band_hazard_contributions(age_band_contributions, output_path: str 
         _add_bar_labels(ax, fmt="%.2f")
     grid.fig.subplots_adjust(top=0.88, wspace=0.28, hspace=0.42)
     grid.fig.suptitle(
-        "Contribuição de faixas etárias ao hazard acumulado",
+        "Age-band contribution to cumulative hazard",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -730,7 +730,7 @@ def plot_sex_indicator_gaps(sex_gaps, output_path: str | Path | None = None):
         sharey=True,
         legend=False,
     )
-    grid.set_axis_labels("Feminino - Masculino", "Localidade")
+    grid.set_axis_labels("Female - Male", "Location")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
     for ax in grid.axes.flat:
@@ -738,7 +738,7 @@ def plot_sex_indicator_gaps(sex_gaps, output_path: str | Path | None = None):
         _add_bar_labels(ax, fmt="%.2f")
     grid.fig.subplots_adjust(top=0.88, wspace=0.42, hspace=0.35)
     grid.fig.suptitle(
-        "Gap feminino-masculino nos indicadores de longevidade",
+        "Female-male gap in longevity indicators",
         x=0.04,
         ha="left",
         fontweight="semibold",

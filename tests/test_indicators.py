@@ -63,7 +63,7 @@ def test_age_band_hazard_contributions_use_hazard_increments():
 def test_sex_indicator_gaps_compare_female_and_male_rows():
     indicators = pd.DataFrame(
         {
-            "country": ["Norte (Brasil) - Feminino", "Norte (Brasil) - Masculino"],
+            "country": ["North Brazil - Female", "North Brazil - Male"],
             "year": [2025, 2025],
             "H_90": [1.2, 1.5],
             "median_age": [86.0, 82.0],
