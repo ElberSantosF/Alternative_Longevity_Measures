@@ -493,7 +493,7 @@ def plot_regional_hazard_gap_by_sex(df, output_path: str | Path | None = None):
     _style_axis(
         ax,
         xlabel="Idade (x)",
-        ylabel="Diferenca de hazard acumulado",
+        ylabel="Diferença de hazard acumulado",
         title="Gap regional: H_Norte - H_Nordeste",
     )
     _legend_outside(ax, title="Sexo")
@@ -521,7 +521,7 @@ def plot_sex_hazard_gap_by_region(df, output_path: str | Path | None = None):
     _style_axis(
         ax,
         xlabel="Idade (x)",
-        ylabel="Diferenca de hazard acumulado",
+        ylabel="Diferença de hazard acumulado",
         title="Gap por sexo: H_masculino - H_feminino",
     )
     _legend_outside(ax, title="Regiao")
@@ -558,13 +558,13 @@ def plot_benchmark_hazard_gap_vs_chile(df, output_path: str | Path | None = None
     )
     for ax in grid.axes.flat:
         ax.axhline(0, color="#28323f", linewidth=1)
-    grid.set_axis_labels("Idade (x)", "Diferenca de hazard acumulado vs Chile")
+    grid.set_axis_labels("Idade (x)", "Diferença de hazard acumulado vs Chile")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
-    _legend_for_grid(grid, title="Regiao")
+    _legend_for_grid(grid, title="Região")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
-        "Benchmark externo: regioes brasileiras vs Chile",
+        "Benchmark externo: regiões brasileiras vs Chile",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -637,3 +637,110 @@ def plot_indicator_bars_brazil_regions(indicators, output_path: str | Path | Non
         fontweight="semibold",
     )
     return _finish(grid.fig, output_path or FIGURES_DIR / "indicator_bars_brazil_regions.png")
+
+
+def plot_conditional_survival(conditional_survival, output_path: str | Path | None = None):
+    """Plot conditional survival probabilities by transition age."""
+    set_theme()
+    plot_data = conditional_survival.dropna(subset=["conditional_survival"]).copy()
+    plot_data["conditional_survival_pct"] = plot_data["conditional_survival"] * 100
+
+    grid = sns.catplot(
+        data=plot_data,
+        x="conditional_survival_pct",
+        y="country",
+        hue="country",
+        col="transition",
+        col_wrap=2,
+        kind="bar",
+        palette=_palette_for(plot_data),
+        height=3.4,
+        aspect=1.35,
+        sharex=False,
+        sharey=True,
+        legend=False,
+    )
+    grid.set_axis_labels("Probabilidade condicional (%)", "Localidade")
+    grid.set_titles("{col_name} anos")
+    _style_facet_grid(grid)
+    for ax in grid.axes.flat:
+        _add_bar_labels(ax, fmt="%.1f")
+    grid.fig.subplots_adjust(top=0.88, wspace=0.28, hspace=0.35)
+    grid.fig.suptitle(
+        "Probabilidade de sobreviver entre idades selecionadas",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "conditional_survival.png")
+
+
+def plot_age_band_hazard_contributions(age_band_contributions, output_path: str | Path | None = None):
+    """Plot cumulative hazard increments by age band."""
+    set_theme()
+    plot_data = age_band_contributions.dropna(subset=["hazard_increment"]).copy()
+
+    grid = sns.catplot(
+        data=plot_data,
+        x="age_band",
+        y="hazard_increment",
+        hue="country",
+        col="country",
+        col_wrap=2,
+        kind="bar",
+        palette=_palette_for(plot_data),
+        height=3.4,
+        aspect=1.35,
+        sharey=False,
+        legend=False,
+    )
+    grid.set_axis_labels("Faixa etária", "Incremento de H")
+    grid.set_titles("{col_name}")
+    _style_facet_grid(grid)
+    for ax in grid.axes.flat:
+        ax.tick_params(axis="x", rotation=25)
+        _add_bar_labels(ax, fmt="%.2f")
+    grid.fig.subplots_adjust(top=0.88, wspace=0.28, hspace=0.42)
+    grid.fig.suptitle(
+        "Contribuição de faixas etárias ao hazard acumulado",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "age_band_hazard_contributions.png")
+
+
+def plot_sex_indicator_gaps(sex_gaps, output_path: str | Path | None = None):
+    """Plot female-minus-male gaps for selected indicators."""
+    set_theme()
+    plot_data = sex_gaps.dropna(subset=["gap_female_minus_male"]).copy()
+
+    grid = sns.catplot(
+        data=plot_data,
+        x="gap_female_minus_male",
+        y="region",
+        hue="region",
+        col="indicator",
+        col_wrap=3,
+        kind="bar",
+        palette=_palette_for(plot_data, "region"),
+        height=3.2,
+        aspect=1.25,
+        sharex=False,
+        sharey=True,
+        legend=False,
+    )
+    grid.set_axis_labels("Feminino - Masculino", "Localidade")
+    grid.set_titles("{col_name}")
+    _style_facet_grid(grid)
+    for ax in grid.axes.flat:
+        ax.axvline(0, color="#28323f", linewidth=1)
+        _add_bar_labels(ax, fmt="%.2f")
+    grid.fig.subplots_adjust(top=0.88, wspace=0.42, hspace=0.35)
+    grid.fig.suptitle(
+        "Gap feminino-masculino nos indicadores de longevidade",
+        x=0.04,
+        ha="left",
+        fontweight="semibold",
+    )
+    return _finish(grid.fig, output_path or FIGURES_DIR / "sex_indicator_gaps.png")

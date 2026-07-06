@@ -11,6 +11,8 @@ from src.config.settings import K_MAX
 
 
 DEFAULT_FIXED_AGES = (60, 70, 80, 90, 100)
+DEFAULT_SURVIVAL_TRANSITIONS = ((60, 80), (60, 90), (80, 90), (90, 100))
+DEFAULT_AGE_BANDS = ((0, 40), (40, 60), (60, 80), (80, 100), (100, 120))
 CONVENTIONAL_INDICATORS = ("e0_approx", "e50_approx", "e90_approx", "modal_age", "median_age")
 CORRELATION_INDICATORS = (
     "H_max",
@@ -140,6 +142,119 @@ def conventional_indicators(
         row["median_age"] = median_age_at_death(group)
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def survival_at_age(group: pd.DataFrame, age: float) -> float:
+    """Return interpolated normalized survival l(x) at a target age."""
+    data = group.dropna(subset=["age", "l"]).sort_values("age")
+    if data.empty or age < data["age"].min() or age > data["age"].max():
+        return float("nan")
+    return float(np.interp(age, data["age"].to_numpy(float), data["l"].to_numpy(float)))
+
+
+def conditional_survival_probabilities(
+    df: pd.DataFrame,
+    *,
+    transitions: tuple[tuple[int, int], ...] = DEFAULT_SURVIVAL_TRANSITIONS,
+    group_cols: tuple[str, ...] = ("country", "year"),
+) -> pd.DataFrame:
+    """Calculate P(survive to end_age | survived to start_age) by group."""
+    rows = []
+    for keys, group in df.groupby(list(group_cols), dropna=False):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        row_base = dict(zip(group_cols, keys))
+        for start_age, end_age in transitions:
+            l_start = survival_at_age(group, start_age)
+            l_end = survival_at_age(group, end_age)
+            probability = l_end / l_start if np.isfinite(l_start) and l_start > 0 else float("nan")
+            rows.append(
+                {
+                    **row_base,
+                    "start_age": start_age,
+                    "end_age": end_age,
+                    "transition": f"{start_age}-{end_age}",
+                    "conditional_survival": probability,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def age_band_hazard_contributions(
+    df: pd.DataFrame,
+    *,
+    bands: tuple[tuple[int, int], ...] = DEFAULT_AGE_BANDS,
+    group_cols: tuple[str, ...] = ("country", "year"),
+) -> pd.DataFrame:
+    """Calculate cumulative hazard increments within age bands."""
+    rows = []
+    for keys, group in df.groupby(list(group_cols), dropna=False):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        row_base = dict(zip(group_cols, keys))
+        data = group.dropna(subset=["age", "H"]).sort_values("age")
+        if data.empty:
+            continue
+        age = data["age"].to_numpy(float)
+        hazard = data["H"].to_numpy(float)
+        for start_age, end_age in bands:
+            if start_age < age.min() or end_age > age.max():
+                increment = float("nan")
+            else:
+                increment = float(np.interp(end_age, age, hazard) - np.interp(start_age, age, hazard))
+            rows.append(
+                {
+                    **row_base,
+                    "start_age": start_age,
+                    "end_age": end_age,
+                    "age_band": f"{start_age}-{end_age}",
+                    "hazard_increment": increment,
+                }
+            )
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    totals = out.groupby(list(group_cols), dropna=False)["hazard_increment"].transform("sum")
+    out["share_of_observed_increment"] = out["hazard_increment"] / totals
+    return out
+
+
+def sex_indicator_gaps(
+    indicators: pd.DataFrame,
+    *,
+    columns: tuple[str, ...] = ("H_80", "H_90", "x_H1", "e0_approx", "median_age", "modal_age"),
+) -> pd.DataFrame:
+    """Calculate female-minus-male gaps for selected indicators by location."""
+    data = indicators.copy()
+    parts = data["country"].astype(str).str.rsplit(" - ", n=1, expand=True)
+    data["region"] = parts[0]
+    data["sex"] = parts[1] if parts.shape[1] > 1 else ""
+    available = [col for col in columns if col in data.columns]
+
+    rows = []
+    for keys, group in data.groupby(["region", "year"], dropna=False):
+        region, year = keys
+        female = group.loc[group["sex"] == "Feminino"]
+        male = group.loc[group["sex"] == "Masculino"]
+        if female.empty or male.empty:
+            continue
+        female_row = female.iloc[0]
+        male_row = male.iloc[0]
+        for column in available:
+            female_value = female_row[column]
+            male_value = male_row[column]
+            rows.append(
+                {
+                    "region": region,
+                    "year": year,
+                    "indicator": column,
+                    "female_value": female_value,
+                    "male_value": male_value,
+                    "gap_female_minus_male": female_value - male_value,
+                }
+            )
+    return pd.DataFrame(rows).dropna(subset=["gap_female_minus_male"])
 
 
 def build_indicators(
