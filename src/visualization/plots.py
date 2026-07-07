@@ -16,11 +16,38 @@ TITLE_PAD = 14
 BRAZIL_REGIONS = ("North Brazil", "Northeast Brazil")
 SEX_ORDER = ("Female", "Male")
 REPORT_INDICATORS = ("H_60", "H_70", "H_80", "H_90", "x_H1", "median_age", "e0_approx")
+INDICATOR_LABELS = {
+    "H_60": "Hazard at 60",
+    "H_70": "Hazard at 70",
+    "H_80": "Hazard at 80",
+    "H_90": "Hazard at 90",
+    "H_100": "Hazard at 100",
+    "x_H1": "Age at H=1",
+    "median_age": "Median age",
+    "modal_age": "Modal age",
+    "e0_approx": "Approx. e0",
+    "e50_approx": "Approx. e50",
+    "e90_approx": "Approx. e90",
+}
 
 
 def _palette_for(data, hue: str = "country"):
     levels = list(dict.fromkeys(data[hue].dropna()))
     return {level: PALETTE[index % len(PALETTE)] for index, level in enumerate(levels)}
+
+
+def _label_indicator(value: str) -> str:
+    return INDICATOR_LABELS.get(value, value.replace("_", " "))
+
+
+def _ordered_categories(data: pd.DataFrame, category: str, value: str, *, ascending: bool = False):
+    return (
+        data.groupby(category, dropna=False)[value]
+        .mean()
+        .sort_values(ascending=ascending)
+        .index
+        .tolist()
+    )
 
 
 def _add_region_sex(data):
@@ -76,9 +103,16 @@ def _style_axis(ax, *, title: str, xlabel: str, ylabel: str):
     ax.margins(x=0.02)
 
 
-def _add_bar_labels(ax, *, fmt: str = "%.1f"):
+def _add_bar_labels(ax, *, fmt: str = "%.1f", padding: int = 3):
     for container in ax.containers:
-        ax.bar_label(container, fmt=fmt, fontsize=8, padding=3, color="#44505e")
+        ax.bar_label(container, fmt=fmt, fontsize=8, padding=padding, color="#44505e")
+
+
+def _add_zero_line(ax, *, orientation: str = "vertical"):
+    if orientation == "vertical":
+        ax.axvline(0, color="#28323f", linewidth=1)
+    else:
+        ax.axhline(0, color="#28323f", linewidth=1)
 
 
 def _style_facet_grid(grid):
@@ -86,6 +120,7 @@ def _style_facet_grid(grid):
         ax.grid(axis="x", visible=False)
         ax.grid(axis="y", color="#e8ebef", linewidth=0.8)
         ax.set_title(ax.get_title(), pad=TITLE_PAD, fontweight="semibold")
+        ax.margins(x=0.05)
     return grid
 
 
@@ -134,7 +169,7 @@ def set_theme() -> None:
 def plot_hazard_curves(df, output_path: str | Path | None = None):
     """Plot H(x) curves for two or more localities."""
     set_theme()
-    fig, ax = plt.subplots(figsize=(11, 5.8))
+    fig, ax = plt.subplots(figsize=(11.5, 6))
     sns.lineplot(
         data=df,
         x="age",
@@ -147,24 +182,23 @@ def plot_hazard_curves(df, output_path: str | Path | None = None):
     max_h = df["H"].max()
     for level in range(1, int(np.floor(max_h)) + 1):
         ax.axhline(level, color="#b7c0ca", linestyle=":", linewidth=1, zorder=0)
-        ax.annotate(
+        ax.text(
+            df["age"].max() + 0.5,
+            level,
             f"H={level}",
-            xy=(1, level),
-            xycoords=("axes fraction", "data"),
-            xytext=(-4, 4),
-            textcoords="offset points",
-            ha="right",
-            va="bottom",
+            ha="left",
+            va="center",
             color="#6c7682",
             fontsize=8,
         )
 
     _style_axis(
         ax,
-        xlabel="Age (x)",
-        ylabel="Cumulative hazard H(x) = -log(l)",
+        xlabel="Age",
+        ylabel="Cumulative hazard, H(x) = -log(l)",
         title="Cumulative mortality hazard",
     )
+    ax.set_xlim(df["age"].min(), df["age"].max() + 4)
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "hazard_curves.png")
 
@@ -201,7 +235,7 @@ def plot_milestone_bars(milestones_long, output_path: str | Path | None = None):
 def plot_survival_curves(df, output_path: str | Path | None = None):
     """Plot normalized survival curves l(x)."""
     set_theme()
-    fig, ax = plt.subplots(figsize=(11, 5.8))
+    fig, ax = plt.subplots(figsize=(11.5, 6))
     sns.lineplot(
         data=df,
         x="age",
@@ -225,10 +259,11 @@ def plot_survival_curves(df, output_path: str | Path | None = None):
     )
     _style_axis(
         ax,
-        xlabel="Age (x)",
+        xlabel="Age",
         ylabel="Normalized survival l(x)",
         title="Survival function by age",
     )
+    ax.set_ylim(-0.02, 1.02)
     _legend_outside(ax)
     return _finish(fig, output_path or FIGURES_DIR / "survival_curves.png")
 
@@ -299,9 +334,10 @@ def plot_milestone_differences(differences, output_path: str | Path | None = Non
 def plot_correlation_heatmap(correlations, output_path: str | Path | None = None):
     """Plot a correlation matrix for longevity indicators."""
     set_theme()
+    labeled = correlations.rename(index=_label_indicator, columns=_label_indicator)
     fig, ax = plt.subplots(figsize=(9.5, 8))
     sns.heatmap(
-        correlations,
+        labeled,
         vmin=-1,
         vmax=1,
         center=0,
@@ -334,13 +370,14 @@ def plot_indicator_scatter(indicators, output_path: str | Path | None = None):
         var_name="indicator",
         value_name="value",
     ).dropna(subset=["H_max", "value"])
+    plot_data["indicator_label"] = plot_data["indicator"].map(_label_indicator)
 
     grid = sns.relplot(
         data=plot_data,
         x="value",
         y="H_max",
         hue="country",
-        col="indicator",
+        col="indicator_label",
         col_wrap=3,
         palette=_palette_for(plot_data),
         height=3.5,
@@ -382,11 +419,12 @@ def plot_indicator_rankings(rankings, output_path: str | Path | None = None):
         value_name="rank",
     ).dropna(subset=["rank"])
     plot_data["indicator"] = plot_data["indicator"].str.replace("rank_", "", regex=False)
+    plot_data["indicator_label"] = plot_data["indicator"].map(_label_indicator)
 
     fig, ax = plt.subplots(figsize=(11.5, 5.8))
     sns.lineplot(
         data=plot_data,
-        x="indicator",
+        x="indicator_label",
         y="rank",
         hue="country",
         marker="o",
@@ -561,6 +599,8 @@ def plot_benchmark_hazard_gap_vs_chile(df, output_path: str | Path | None = None
     grid.set_axis_labels("Age (x)", "Cumulative hazard difference vs Chile")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
+    for ax in grid.axes.flat:
+        ax.set_xlabel("Age")
     _legend_for_grid(grid, title="Region")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
@@ -578,6 +618,8 @@ def plot_indicator_heatmap_standardized(indicators, output_path: str | Path | No
     columns = [col for col in REPORT_INDICATORS if col in indicators.columns]
     values = indicators.set_index("country")[columns].copy()
     standardized = (values - values.mean()) / values.std(ddof=0)
+    values = values.rename(columns=_label_indicator)
+    standardized = standardized.rename(columns=_label_indicator)
 
     fig, ax = plt.subplots(figsize=(10.5, 5.8))
     sns.heatmap(
@@ -610,13 +652,14 @@ def plot_indicator_bars_brazil_regions(indicators, output_path: str | Path | Non
         var_name="indicator",
         value_name="value",
     ).dropna(subset=["value"])
+    long["indicator_label"] = long["indicator"].map(_label_indicator)
 
     grid = sns.catplot(
         data=long,
         x="value",
         y="country",
         hue="sex",
-        col="indicator",
+        col="indicator_label",
         col_wrap=3,
         kind="bar",
         palette=_palette_for(long, "sex"),
@@ -644,11 +687,13 @@ def plot_conditional_survival(conditional_survival, output_path: str | Path | No
     set_theme()
     plot_data = conditional_survival.dropna(subset=["conditional_survival"]).copy()
     plot_data["conditional_survival_pct"] = plot_data["conditional_survival"] * 100
+    order = _ordered_categories(plot_data, "country", "conditional_survival_pct", ascending=False)
 
     grid = sns.catplot(
         data=plot_data,
         x="conditional_survival_pct",
         y="country",
+        order=order,
         hue="country",
         col="transition",
         col_wrap=2,
@@ -660,12 +705,13 @@ def plot_conditional_survival(conditional_survival, output_path: str | Path | No
         sharey=True,
         legend=False,
     )
-    grid.set_axis_labels("Conditional probability (%)", "Location")
+    grid.set_axis_labels("Survival probability (%)", "")
     grid.set_titles("{col_name} years")
     _style_facet_grid(grid)
     for ax in grid.axes.flat:
-        _add_bar_labels(ax, fmt="%.1f")
-    grid.fig.subplots_adjust(top=0.88, wspace=0.28, hspace=0.35)
+        _add_bar_labels(ax, fmt="%.1f", padding=4)
+        ax.set_xlim(right=ax.get_xlim()[1] * 1.08)
+    grid.fig.subplots_adjust(top=0.88, wspace=0.24, hspace=0.35)
     grid.fig.suptitle(
         "Probability of surviving between selected ages",
         x=0.04,
@@ -679,11 +725,13 @@ def plot_age_band_hazard_contributions(age_band_contributions, output_path: str 
     """Plot cumulative hazard increments by age band."""
     set_theme()
     plot_data = age_band_contributions.dropna(subset=["hazard_increment"]).copy()
+    order = list(dict.fromkeys(plot_data["age_band"]))
 
     grid = sns.catplot(
         data=plot_data,
         x="age_band",
         y="hazard_increment",
+        order=order,
         hue="country",
         col="country",
         col_wrap=2,
@@ -714,13 +762,16 @@ def plot_sex_indicator_gaps(sex_gaps, output_path: str | Path | None = None):
     """Plot female-minus-male gaps for selected indicators."""
     set_theme()
     plot_data = sex_gaps.dropna(subset=["gap_female_minus_male"]).copy()
+    plot_data["indicator_label"] = plot_data["indicator"].map(_label_indicator)
+    order = _ordered_categories(plot_data, "region", "gap_female_minus_male", ascending=False)
 
     grid = sns.catplot(
         data=plot_data,
         x="gap_female_minus_male",
         y="region",
+        order=order,
         hue="region",
-        col="indicator",
+        col="indicator_label",
         col_wrap=3,
         kind="bar",
         palette=_palette_for(plot_data, "region"),
@@ -730,13 +781,16 @@ def plot_sex_indicator_gaps(sex_gaps, output_path: str | Path | None = None):
         sharey=True,
         legend=False,
     )
-    grid.set_axis_labels("Female - Male", "Location")
+    grid.set_axis_labels("Female - male", "")
     grid.set_titles("{col_name}")
     _style_facet_grid(grid)
     for ax in grid.axes.flat:
-        ax.axvline(0, color="#28323f", linewidth=1)
+        _add_zero_line(ax)
         _add_bar_labels(ax, fmt="%.2f")
-    grid.fig.subplots_adjust(top=0.88, wspace=0.42, hspace=0.35)
+        left, right = ax.get_xlim()
+        span = right - left
+        ax.set_xlim(left - span * 0.04, right + span * 0.08)
+    grid.fig.subplots_adjust(top=0.88, wspace=0.35, hspace=0.35)
     grid.fig.suptitle(
         "Female-male gap in longevity indicators",
         x=0.04,
