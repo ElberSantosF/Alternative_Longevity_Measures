@@ -7,13 +7,13 @@ import pandas as pd
 
 from src.analysis.hazard import h_at_age
 from src.analysis.milestones import milestone_long, milestone_wide
-from src.config.settings import K_MAX
+from src.config.settings import K_MAX, MAX_ANALYSIS_AGE
 
 
-DEFAULT_FIXED_AGES = (60, 70, 80, 90, 100)
-DEFAULT_SURVIVAL_TRANSITIONS = ((60, 80), (60, 90), (80, 90), (90, 100))
-DEFAULT_AGE_BANDS = ((0, 40), (40, 60), (60, 80), (80, 100), (100, 120))
-CONVENTIONAL_INDICATORS = ("e0_approx", "e50_approx", "e90_approx", "modal_age", "median_age")
+DEFAULT_FIXED_AGES = (60, 70, 80, 90)
+DEFAULT_SURVIVAL_TRANSITIONS = ((60, 80), (60, 90), (80, 90))
+DEFAULT_AGE_BANDS = ((0, 40), (40, 60), (60, 80), (80, 90))
+CONVENTIONAL_INDICATORS = ("e0_approx", "e50_approx", "modal_age", "median_age")
 CORRELATION_INDICATORS = (
     "H_max",
     "H_60",
@@ -28,22 +28,11 @@ CORRELATION_INDICATORS = (
 )
 
 
-def h100_by_group(
-    df: pd.DataFrame,
-    *,
-    group_cols: tuple[str, ...] = ("country", "year"),
-) -> pd.DataFrame:
-    """Calculate cumulative hazard at age 100 for each group."""
-    rows = []
-    for keys, group in df.groupby(list(group_cols), dropna=False):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        row = dict(zip(group_cols, keys))
-        row["H_100"] = h_at_age(group, 100)
-        l_values = group.loc[group["age"] == 100, "l"]
-        row["l_100"] = float(l_values.iloc[0]) if not l_values.empty else float("nan")
-        rows.append(row)
-    return pd.DataFrame(rows)
+def _analysis_age_subset(df: pd.DataFrame, age_col: str = "age") -> pd.DataFrame:
+    """Keep only ages in the project's analysis scope."""
+    if age_col not in df.columns:
+        return df.copy()
+    return df.loc[df[age_col] <= MAX_ANALYSIS_AGE].copy()
 
 
 def fixed_age_hazards(
@@ -52,9 +41,10 @@ def fixed_age_hazards(
     ages: tuple[int, ...] = DEFAULT_FIXED_AGES,
     group_cols: tuple[str, ...] = ("country", "year"),
 ) -> pd.DataFrame:
-    """Calculate H(age) for fixed ages such as 60, 70, 80, 90 and 100."""
+    """Calculate H(age) for fixed ages through the project age ceiling."""
     rows = []
-    for keys, group in df.groupby(list(group_cols), dropna=False):
+    data = _analysis_age_subset(df)
+    for keys, group in data.groupby(list(group_cols), dropna=False):
         if not isinstance(keys, tuple):
             keys = (keys,)
         row = dict(zip(group_cols, keys))
@@ -69,7 +59,7 @@ def fixed_age_hazards(
 
 def median_age_at_death(group: pd.DataFrame) -> float:
     """Estimate the age where normalized survival l(x) crosses 0.5."""
-    data = group.dropna(subset=["age", "l"]).sort_values("age")
+    data = _analysis_age_subset(group).dropna(subset=["age", "l"]).sort_values("age")
     if data.empty or data["l"].min() > 0.5 or data["l"].max() < 0.5:
         return float("nan")
 
@@ -81,7 +71,7 @@ def median_age_at_death(group: pd.DataFrame) -> float:
 
 def modal_age_at_death(group: pd.DataFrame, *, min_age: float = 10) -> float:
     """Estimate the adult modal age at death from declines in l(x)."""
-    data = group.dropna(subset=["age", "l"]).sort_values("age")
+    data = _analysis_age_subset(group).dropna(subset=["age", "l"]).sort_values("age")
     if len(data) < 3:
         return float("nan")
 
@@ -103,7 +93,7 @@ def remaining_life_expectancy_approx(group: pd.DataFrame, target_age: float) -> 
     This integrates the observed survival curve using the trapezoid rule. It is
     a period-table approximation and does not extrapolate beyond the final age.
     """
-    data = group.dropna(subset=["age", "l"]).sort_values("age")
+    data = _analysis_age_subset(group).dropna(subset=["age", "l"]).sort_values("age")
     if len(data) < 2:
         return float("nan")
 
@@ -137,7 +127,6 @@ def conventional_indicators(
         row = dict(zip(group_cols, keys))
         row["e0_approx"] = remaining_life_expectancy_approx(group, 0)
         row["e50_approx"] = remaining_life_expectancy_approx(group, 50)
-        row["e90_approx"] = remaining_life_expectancy_approx(group, 90)
         row["modal_age"] = modal_age_at_death(group)
         row["median_age"] = median_age_at_death(group)
         rows.append(row)
@@ -146,7 +135,7 @@ def conventional_indicators(
 
 def survival_at_age(group: pd.DataFrame, age: float) -> float:
     """Return interpolated normalized survival l(x) at a target age."""
-    data = group.dropna(subset=["age", "l"]).sort_values("age")
+    data = _analysis_age_subset(group).dropna(subset=["age", "l"]).sort_values("age")
     if data.empty or age < data["age"].min() or age > data["age"].max():
         return float("nan")
     return float(np.interp(age, data["age"].to_numpy(float), data["l"].to_numpy(float)))
@@ -192,7 +181,7 @@ def age_band_hazard_contributions(
         if not isinstance(keys, tuple):
             keys = (keys,)
         row_base = dict(zip(group_cols, keys))
-        data = group.dropna(subset=["age", "H"]).sort_values("age")
+        data = _analysis_age_subset(group).dropna(subset=["age", "H"]).sort_values("age")
         if data.empty:
             continue
         age = data["age"].to_numpy(float)
@@ -264,15 +253,12 @@ def build_indicators(
     group_cols: tuple[str, ...] = ("country", "year"),
 ) -> pd.DataFrame:
     """Combine hazard-based and conventional indicators in one wide table."""
-    h100 = h100_by_group(df, group_cols=group_cols)
-    fixed = fixed_age_hazards(df, group_cols=group_cols)
-    conventional = conventional_indicators(df, group_cols=group_cols)
-    milestones = milestone_wide(df, k_max=k_max, group_cols=group_cols)
-    return (
-        fixed.merge(h100, on=list(group_cols), how="left", suffixes=("", "_exact"))
-        .drop(columns=["H_100_exact"], errors="ignore")
-        .merge(conventional, on=list(group_cols), how="left")
-        .merge(milestones, on=list(group_cols), how="left")
+    data = _analysis_age_subset(df)
+    fixed = fixed_age_hazards(data, group_cols=group_cols)
+    conventional = conventional_indicators(data, group_cols=group_cols)
+    milestones = milestone_wide(data, k_max=k_max, group_cols=group_cols)
+    return fixed.merge(conventional, on=list(group_cols), how="left").merge(
+        milestones, on=list(group_cols), how="left"
     )
 
 
@@ -283,7 +269,7 @@ def build_milestone_long(
     group_cols: tuple[str, ...] = ("country", "year"),
 ) -> pd.DataFrame:
     """Return milestone ages in long format for plotting."""
-    return milestone_long(df, k_max=k_max, group_cols=group_cols)
+    return milestone_long(_analysis_age_subset(df), k_max=k_max, group_cols=group_cols)
 
 
 def milestone_differences(
@@ -324,7 +310,7 @@ def indicator_rankings(
     better.
     """
     ranking = indicators[["country", "year", *[c for c in columns if c in indicators.columns]]].copy()
-    lower_is_better = {"H_max", "H_60", "H_70", "H_80", "H_90", "H_100"}
+    lower_is_better = {"H_max", "H_60", "H_70", "H_80", "H_90"}
     for column in columns:
         if column not in ranking.columns:
             continue

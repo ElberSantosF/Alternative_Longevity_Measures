@@ -53,15 +53,16 @@ The project uses period life tables only. Starting from `lx`, it calculates:
 ```text
 l = lx / l0
 H = -log(l)
-H(60), H(70), H(80), H(90), H(100)
+H(60), H(70), H(80), H(90)
 x_H1 ... x_H8
 approximate median age
 approximate modal age
-approximate e0/e50/e90 from the area under l(x)
+approximate e0/e50 from the area under l(x), capped at age 90
 correlations and rankings across indicators
 ```
 
 Life expectancy, median age, and modal age measures are approximations derived from the `l(x)` curve because the local spreadsheets do not include `ex`, `dx`, or `ax`.
+All project analyses exclude ages above 90.
 
 ## Usage
 

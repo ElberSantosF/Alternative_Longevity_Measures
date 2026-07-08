@@ -45,6 +45,8 @@ def test_build_indicators_adds_conventional_columns():
     out = build_indicators(_life_table())
 
     assert {"e0_approx", "e50_approx", "modal_age", "median_age"}.issubset(out.columns)
+    assert "e90_approx" not in out.columns
+    assert "H_100" not in out.columns
 
 
 def test_conditional_survival_probabilities_divide_l_values():

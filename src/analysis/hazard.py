@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config.settings import EPSILON
+from src.config.settings import EPSILON, MAX_ANALYSIS_AGE
 
 
 def add_survival_hazard(
@@ -14,6 +14,7 @@ def add_survival_hazard(
     group_cols: tuple[str, ...] = ("country", "year"),
     age_col: str = "age",
     lx_col: str = "lx",
+    max_age: float | None = MAX_ANALYSIS_AGE,
     epsilon: float = EPSILON,
 ) -> pd.DataFrame:
     """Add normalized survival ``l`` and cumulative hazard ``H``.
@@ -30,6 +31,8 @@ def add_survival_hazard(
     out[age_col] = pd.to_numeric(out[age_col], errors="coerce")
     out[lx_col] = pd.to_numeric(out[lx_col], errors="coerce")
     out = out.dropna(subset=[age_col, lx_col]).sort_values(list(group_cols) + [age_col])
+    if max_age is not None:
+        out = out.loc[out[age_col] <= max_age].copy()
     l0 = out.groupby(list(group_cols), dropna=False)[lx_col].transform("first")
     if ((~np.isfinite(l0)) | (l0 <= 0)).any():
         raise ValueError("Each group must have a positive lx at the minimum age.")
