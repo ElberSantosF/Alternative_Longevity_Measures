@@ -11,24 +11,46 @@ import seaborn as sns
 
 from src.config.settings import MAX_ANALYSIS_AGE
 
-PALETTE = ["#1E3A8A", "#0F766E", "#2563EB", "#0891B2", "#475569", "#64748B"]
+PALETTE = [
+    "#1E3A8A",
+    "#0F766E",
+    "#7C2D12",
+    "#6D28D9",
+    "#BE123C",
+    "#2563EB",
+    "#0891B2",
+    "#475569",
+    "#64748B",
+]
 REPORT_COLORS = {
     "Chile": "#1F2937",
     "North Brazil": "#1E3A8A",
     "Northeast Brazil": "#0F766E",
+    "Southeast Brazil": "#7C2D12",
+    "South Brazil": "#6D28D9",
+    "Central-West Brazil": "#BE123C",
     "Female": "#0891B2",
     "Male": "#475569",
 }
-BAR_PALETTE = ["#1F2937", "#4B5563", "#6B7280", "#9CA3AF", "#334155", "#64748B"]
+BAR_PALETTE = ["#1F2937", "#4B5563", "#6B7280", "#7C2D12", "#6D28D9", "#BE123C", "#334155", "#64748B"]
 BAR_COLORS = {
     "Chile": "#1F2937",
     "North Brazil": "#4B5563",
     "Northeast Brazil": "#6B7280",
+    "Southeast Brazil": "#7C2D12",
+    "South Brazil": "#6D28D9",
+    "Central-West Brazil": "#BE123C",
     "Female": "#9CA3AF",
     "Male": "#334155",
 }
 TITLE_PAD = 16
-BRAZIL_REGIONS = ("North Brazil", "Northeast Brazil")
+BRAZIL_REGIONS = (
+    "North Brazil",
+    "Northeast Brazil",
+    "Southeast Brazil",
+    "South Brazil",
+    "Central-West Brazil",
+)
 SEX_ORDER = ("Female", "Male")
 REPORT_INDICATORS = ("H_60", "H_70", "H_80", "H_90", "x_H1", "median_age", "e0_approx")
 INDICATOR_LABELS = {
@@ -44,6 +66,9 @@ INDICATOR_LABELS = {
 DISPLAY_LABELS = {
     "North Brazil": "North Brazil",
     "Northeast Brazil": "Northeast Brazil",
+    "Southeast Brazil": "Southeast Brazil",
+    "South Brazil": "South Brazil",
+    "Central-West Brazil": "Central-West Brazil",
     "Chile": "Chile",
     "Female": "Female",
     "Male": "Male",
@@ -51,6 +76,12 @@ DISPLAY_LABELS = {
     "North Brazil - Male": "North Brazil - Male",
     "Northeast Brazil - Female": "Northeast Brazil - Female",
     "Northeast Brazil - Male": "Northeast Brazil - Male",
+    "Southeast Brazil - Female": "Southeast Brazil - Female",
+    "Southeast Brazil - Male": "Southeast Brazil - Male",
+    "South Brazil - Female": "South Brazil - Female",
+    "South Brazil - Male": "South Brazil - Male",
+    "Central-West Brazil - Female": "Central-West Brazil - Female",
+    "Central-West Brazil - Male": "Central-West Brazil - Male",
     "Chile - Female": "Chile - Female",
     "Chile - Male": "Chile - Male",
 }
@@ -526,7 +557,7 @@ def plot_indicator_rankings(rankings, output_path: str | Path | None = None):
 
 
 def plot_regional_hazard_by_sex(df, output_path: str | Path | None = None):
-    """Compare cumulative hazard for North and Northeast, faceted by sex."""
+    """Compare cumulative hazard for Brazilian regions, faceted by sex."""
     set_theme()
     plot_data = _brazil_region_data(df)
     grid = sns.relplot(
@@ -549,7 +580,7 @@ def plot_regional_hazard_by_sex(df, output_path: str | Path | None = None):
     _legend_for_grid(grid, title="Region")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
-        "North and Northeast Brazil: cumulative hazard by sex",
+        "Brazilian regions: cumulative hazard by sex",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -558,7 +589,7 @@ def plot_regional_hazard_by_sex(df, output_path: str | Path | None = None):
 
 
 def plot_regional_survival_by_sex(df, output_path: str | Path | None = None):
-    """Compare normalized survival for North and Northeast, faceted by sex."""
+    """Compare normalized survival for Brazilian regions, faceted by sex."""
     set_theme()
     plot_data = _brazil_region_data(df)
     grid = sns.relplot(
@@ -581,7 +612,7 @@ def plot_regional_survival_by_sex(df, output_path: str | Path | None = None):
     _legend_for_grid(grid, title="Region")
     grid.fig.subplots_adjust(top=0.82, right=0.78, wspace=0.18)
     grid.fig.suptitle(
-        "North and Northeast Brazil: survival by sex",
+        "Brazilian regions: survival by sex",
         x=0.04,
         ha="left",
         fontweight="semibold",
@@ -654,6 +685,8 @@ def plot_benchmark_hazard_gap_vs_chile(df, output_path: str | Path | None = None
     wide = selected.pivot_table(index=["sex", "age"], columns="region", values="H").reset_index()
     rows = []
     for region in BRAZIL_REGIONS:
+        if region not in wide.columns or "Chile" not in wide.columns:
+            continue
         temp = wide[["sex", "age", "Chile", region]].copy()
         temp["region"] = region
         temp["gap"] = temp[region] - temp["Chile"]
@@ -722,7 +755,7 @@ def plot_indicator_heatmap_standardized(indicators, output_path: str | Path | No
 
 
 def plot_indicator_bars_brazil_regions(indicators, output_path: str | Path | None = None):
-    """Plot selected indicators for North and Northeast only."""
+    """Plot selected indicators for Brazilian regions only."""
     set_theme()
     plot_data = _brazil_region_data(indicators)
     columns = [col for col in REPORT_INDICATORS if col in plot_data.columns]
@@ -754,7 +787,7 @@ def plot_indicator_bars_brazil_regions(indicators, output_path: str | Path | Non
     _legend_for_grid(grid, title="Sex")
     grid.fig.subplots_adjust(top=0.88, right=0.78, wspace=0.42, hspace=0.35)
     grid.fig.suptitle(
-        "Selected indicators: North and Northeast Brazil",
+        "Selected indicators: Brazilian regions",
         x=0.04,
         ha="left",
         fontweight="semibold",

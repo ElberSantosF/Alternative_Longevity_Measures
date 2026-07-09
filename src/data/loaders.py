@@ -11,7 +11,7 @@ import pandas as pd
 from src.config.settings import DATA_DIR, RAW_DATA_DIR
 
 
-AGE_ALIASES = ("age", "Age", "x")
+AGE_ALIASES = ("age", "Age", "x", "idade", "IDADE")
 LX_ALIASES = ("lx", "LX", "Lx")
 YEAR_ALIASES = ("year", "Year")
 

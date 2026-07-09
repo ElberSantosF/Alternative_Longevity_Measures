@@ -27,6 +27,15 @@ def test_load_life_table_standardizes_columns_from_csv(tmp_path):
     assert out["age"].tolist() == [0, 1]
 
 
+def test_load_life_table_accepts_portuguese_age_column(tmp_path):
+    path = tmp_path / "life_table.csv"
+    pd.DataFrame({"IDADE": [0, 1], "lx": [100000, 99000]}).to_csv(path, index=False)
+
+    out = load_life_table(path, country="Test", year=2025)
+
+    assert out["age"].tolist() == [0, 1]
+
+
 def test_load_life_tables_concatenates_mapping_items(tmp_path):
     first = tmp_path / "first.csv"
     second = tmp_path / "second.csv"
