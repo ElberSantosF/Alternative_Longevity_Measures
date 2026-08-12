@@ -323,20 +323,40 @@ def _top_legend(fig, handles, labels, *, ncol: int = 3, y: float | None = None):
     )
 
 
+# As curvas regionais ficam a 1,4-8,5 pontos umas das outras: com traço contínuo
+# e espesso elas viram uma faixa única. Um padrão de traço por região deixa cada
+# uma visível mesmo onde se sobrepõem.
+REGION_LINESTYLES = {
+    "North Brazil": "-",
+    "Northeast Brazil": (0, (6.0, 1.6)),
+    "Central-West Brazil": (0, (1.4, 1.5)),
+    "Southeast Brazil": (0, (8.0, 1.6, 1.4, 1.6)),
+    "South Brazil": (0, (3.0, 1.6)),
+    "Chile": (0, (4, 2)),
+}
+
+
+def _curve_style(region: str, spec: FigureProfile) -> dict:
+    """Line weight and dash pattern used for one locality in the curve panels."""
+
+    is_chile = region == "Chile"
+    return {
+        "color": REGION_COLORS[region],
+        # Linhas finas: cinco curvas de 3 pt não cabem na faixa que as separa.
+        "linewidth": spec.line_width * (0.78 if is_chile else 0.62),
+        "linestyle": REGION_LINESTYLES.get(region, "-"),
+    }
+
+
 def _region_legend(fig, regions, *, y: float | None = None):
+    spec = fig._figure_profile
     handles = [
-        Line2D(
-            [0],
-            [0],
-            color=REGION_COLORS[region],
-            linewidth=fig._figure_profile.line_width,
-            linestyle=(0, (4, 2)) if region == "Chile" else "-",
-            marker="o",
-            markersize=fig._figure_profile.marker_size,
-        )
+        Line2D([0], [0], marker="o", markersize=spec.marker_size, **_curve_style(region, spec))
         for region in regions
     ]
-    return _top_legend(fig, handles, [_display_label(region) for region in regions], ncol=3, y=y)
+    # Uma única linha mantém a legenda longe dos títulos dos painéis.
+    ncol = len(regions) if len(regions) <= 6 else 3
+    return _top_legend(fig, handles, [_display_label(region) for region in regions], ncol=ncol, y=y)
 
 
 def _sex_legend(fig, sexes, *, y: float | None = None):
@@ -417,6 +437,21 @@ def _plot_curves_by_sex(
     axes = axes.ravel()
     start_age = _analysis_start_age(spec)
     present_regions = [region for region in regions if region in plot_data["region"].unique()]
+    # Em escala linear as curvas regionais de H(x) ficam a 1,4-6 pontos umas das
+    # outras e se fundem. A escala logarítmica amplia a diferença relativa, que é
+    # justamente onde as regiões se distinguem. Só é possível quando o recorte
+    # exclui a idade 0, em que H(0)=0 não tem logaritmo.
+    log_scale = value == "H" and start_age > 0
+    log_limits, log_ticks = None, []
+    if log_scale:
+        visible = plot_data.loc[plot_data["age"] >= start_age, value]
+        visible = visible[visible > 0]
+        log_limits = (float(visible.min()) / 1.35, float(visible.max()) * 1.25)
+        log_ticks = [
+            tick
+            for tick in (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
+            if log_limits[0] <= tick <= log_limits[1]
+        ]
 
     for ax, sex in zip(axes, present_sexes):
         for region in present_regions:
@@ -425,42 +460,69 @@ def _plot_curves_by_sex(
             ].sort_values("age")
             if series.empty:
                 continue
+            is_chile = region == "Chile"
+            # Marcadores apenas nas décadas: as curvas regionais quase se sobrepõem
+            # e um marcador a cada 5 anos vira ruído.
+            decade_marks = np.flatnonzero(series["age"].to_numpy(float) % 10 == 0)
             ax.plot(
                 series["age"],
                 series[value],
-                color=REGION_COLORS[region],
-                linewidth=spec.line_width + (0.35 if region == "Chile" else 0),
-                linestyle=(0, (4, 2)) if region == "Chile" else "-",
                 marker="o",
-                markersize=spec.marker_size,
+                markevery=list(decade_marks),
+                markersize=spec.marker_size * 0.85,
                 markeredgecolor="white",
-                markeredgewidth=0.55,
-                zorder=3,
+                markeredgewidth=0.6,
+                zorder=4 if is_chile else 3,
+                **_curve_style(region, spec),
             )
         if reference is not None:
             ax.axhline(reference, color=MUTED, linewidth=1, linestyle=(0, (2, 2)), zorder=1)
             label = r"$H(x)=1$" if value == "H" else r"$\ell(x)=e^{-1}$"
+            # Ancorado à esquerda, onde as curvas estão longe da linha de referência.
             ax.text(
-                0.985,
+                0.015,
                 reference,
                 label,
                 transform=ax.get_yaxis_transform(),
-                ha="right",
+                ha="left",
                 va="bottom",
                 color=MUTED,
                 fontsize=spec.note_size,
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 1.5},
+                zorder=5,
             )
         style_axis(ax, xlabel="Idade (anos)", ylabel=ylabel if ax is axes[0] else "", grid_axis="y")
         ax.set_title(_display_label(sex), fontweight="semibold", pad=8)
-        ax.set_xlim(start_age, MAX_ANALYSIS_AGE)
+        # Folga nas bordas: sem ela a curva e o marcador dos 90 anos são cortados
+        # pela moldura e o gráfico parece interrompido antes do fim.
+        span = MAX_ANALYSIS_AGE - start_age
+        ax.set_xlim(start_age - span * 0.03, MAX_ANALYSIS_AGE + span * 0.03)
         ax.set_xticks([40, 50, 60, 70, 80, 90] if start_age else [0, 20, 40, 60, 80, 90])
-        ax.yaxis.set_major_formatter(decimal_formatter(2 if value == "H" else 1))
-        if value == "l":
-            ax.set_ylim(0, 1.02)
+        if log_scale:
+            ax.set_yscale("log")
+            ax.set_ylim(*log_limits)
+            ax.set_yticks(log_ticks)
+            ax.set_yticks([], minor=True)
+            ax.set_yticklabels(
+                [format_pt(tick, 2 if tick < 0.1 else (1 if tick < 1 else 0)) for tick in log_ticks]
+            )
+        else:
+            ax.yaxis.set_major_formatter(decimal_formatter(2 if value == "H" else 1))
+            if value == "l":
+                ax.set_ylim(0, 1.04)
+            else:
+                ax.margins(y=0.09)
 
-    add_header(fig, title, _subtitle(plot_data, profile=spec))
+    add_header(
+        fig,
+        title,
+        _subtitle(plot_data, profile=spec, extra="escala logarítmica" if log_scale else ""),
+    )
     _region_legend(fig, present_regions)
-    _finalize_layout(fig, left=0.085, right=0.975, bottom=0.16, top=0.70, wspace=0.12)
+    # No perfil de relatório a nota metodológica ocupa duas linhas: sem a margem
+    # extra ela encosta no rótulo do eixo x.
+    bottom = 0.16 if spec.name == "slides" else 0.24
+    _finalize_layout(fig, left=0.085, right=0.975, bottom=bottom, top=0.70, wspace=0.12)
     return _finish(
         fig,
         output_path,
