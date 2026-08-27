@@ -33,9 +33,9 @@ Place the spreadsheets in `data/raw/`. The loader accepts `.xlsx`, `.xls`, and `
 Register the spreadsheets in `data/metadata.csv` using standardized names without accents or spaces:
 
 ```text
-female_life_table_northeast_brazil_2025.xlsx
+female_life_table_northeast_brazil_2023.xlsx
 female_life_table_chile_2023.xlsx
-male_life_table_northeast_brazil_2025.xlsx
+male_life_table_northeast_brazil_2023.xlsx
 male_life_table_chile_2023.xlsx
 ```
 
@@ -43,7 +43,7 @@ Example `metadata.csv`:
 
 ```csv
 filename,country,year,sex,label
-female_life_table_northeast_brazil_2025.xlsx,Northeast Brazil,2025,Female,Northeast Brazil - Female
+female_life_table_northeast_brazil_2023.xlsx,Northeast Brazil,2023,Female,Northeast Brazil - Female
 ```
 
 ## Analyses
@@ -72,9 +72,9 @@ from src.analysis.hazard import add_survival_hazard
 from src.analysis.indicators import build_indicators
 
 df = load_life_table(
-    "female_life_table_northeast_brazil_2025.xlsx",
+    "female_life_table_northeast_brazil_2023.xlsx",
     country="Northeast Brazil",
-    year=2025,
+    year=2023,
 )
 lt = add_survival_hazard(df)
 indicators = build_indicators(lt)
