@@ -236,6 +236,7 @@ REICHENHEIM, M. E.; SOUZA, E. R.; MORAES, C. L.; MELLO JORGE, M. H. P.; SILVA, C
 pip install -r requirements.txt
 python -m pytest
 python scripts/build_report_figures.py
+python scripts/build_shareable_report.py
 ```
 
-As tábuas estão em `data/raw/` e catalogadas em `data/metadata.csv`. As funções de cálculo estão em `src/analysis/hazard.py`, `src/analysis/milestones.py` e `src/analysis/indicators.py`. A análise exploratória completa está em `notebooks/01_local_excel_analysis.ipynb`.
+As tábuas estão em `data/raw/` e catalogadas em `data/metadata.csv`. As funções de cálculo estão em `src/analysis/hazard.py`, `src/analysis/milestones.py` e `src/analysis/indicators.py`. A análise exploratória completa está em `notebooks/01_local_excel_analysis.ipynb`. O último comando gera `relatorio_medidas_alternativas_longevidade_compartilhavel.md`, uma cópia deste documento com as figuras embutidas no próprio arquivo, para envio a quem não tem acesso ao repositório.
